@@ -1,10 +1,27 @@
-﻿(async function(){
-  const el = document.getElementById('app');
-  try{
-    const r = await fetch('http://127.0.0.1:8000/health');
-    const j = await r.json();
-    el.innerHTML = <pre></pre>;
-  }catch(e){
-    el.innerHTML = '<b>No se pudo contactar el backend</b>';
+﻿(function(){
+  const stateTxt = document.getElementById('stateTxt');
+  const dot = document.getElementById('dot');
+  const clock = document.getElementById('clock');
+
+  const steps = [
+    'Inicializando interfaz',
+    'Cargando estilos',
+    'Montando componentes',
+    'Listo para Fase 1'
+  ];
+  let i=0;
+  function cycle(){
+    stateTxt.textContent = steps[i % steps.length];
+    i++;
   }
+  cycle();
+  setInterval(cycle, 1600);
+
+  function tickClock(){
+    const now = new Date();
+    const pad = n => String(n).padStart(2,'0');
+    clock.textContent = 'Hora local: ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
 })();

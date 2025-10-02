@@ -1,5 +1,8 @@
-﻿# scripts/run_backend.ps1 — Arrancar backend (requiere uvicorn instalado)
-param([int]\ = 8000)
-Set-Location 'C:\CIDESA_MVP\backend'
-if (Test-Path .venv\Scripts\Activate.ps1) { . .\.venv\Scripts\Activate.ps1 }
-uvicorn app.main:app --reload --port \
+﻿# scripts\run_backend.ps1
+param([int]$Port = 8000)
+$ErrorActionPreference = 'Stop'
+Set-Location 'C:\CIDESA_MVP\backend_stdlib'
+try { Stop-Transcript | Out-Null } catch {}
+Start-Transcript -Path 'C:\CIDESA_MVP\logs\backend.log' -Append | Out-Null
+Write-Host "Log: C:\CIDESA_MVP\logs\backend.log"
+& py 'C:\CIDESA_MVP\backend_stdlib\backend_simple.py' --port $Port

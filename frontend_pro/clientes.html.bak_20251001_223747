@@ -1,0 +1,138 @@
+﻿<!doctype html><html lang="es"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>CIDESA LOGISTICS — Alta de Clientes</title><link rel="stylesheet" href="./styles.css"/>
+</head><body>
+<aside><div class="brand"><div class="logo"><span>CL</span></div>
+<div><strong>CIDESA LOGISTICS</strong><div class="badge">Módulo: Clientes</div></div></div>
+<nav>
+  <a href="./index.html">🏠 Inicio</a>
+  <a href="./clientes.html">👤 Alta de Clientes</a>
+</nav></aside>
+<main>
+  <div class="card"><h1>Alta de Clientes</h1><div class="row"><button onclick="location.href='index.html'">⬅️ Regresar</button></div></div>
+  <div class="card">
+    <h2>Nuevo / Editar</h2>
+    <form id="frmCliente" class="row" style="align-items:flex-start">
+      <input type="hidden" id="cliente_id"/>
+      <div style="flex:1;min-width:260px"><label>Nombre / Razón social</label><br/><input id="razon_social" required/></div>
+      <div style="width:200px"><label>RFC</label><br/><input id="rfc" required placeholder="12 o 13 chars"/></div>
+      <div style="width:220px"><label>Teléfono</label><br/><input id="telefono"/></div>
+      <div style="width:260px"><label>Email</label><br/><input id="email" type="email"/></div>
+      <div style="width:260px"><label>Email principal</label><br/><input id="email_principal" type="email"/></div>
+      <div style="flex-basis:100%"><label>Observaciones</label><br/><textarea id="observaciones" rows="3"></textarea></div>
+      <div style="flex-basis:100%" class="contacts">
+        <h3>Contactos</h3><div id="contactos"></div>
+        <button type="button" class="primary" id="btnAddContacto">+ Añadir contacto</button>
+      </div>
+      <div style="flex-basis:100%">
+        <button type="submit" class="primary" id="btnGuardar">💾 Guardar</button>
+        <button type="button" id="btnNuevo">🗑️ Limpiar</button>
+      </div>
+    </form>
+  </div>
+  <div class="card">
+    <h2>Clientes registrados</h2>
+    <div class="row"><input id="filtro" placeholder="Buscar por nombre o RFC" style="min-width:280px"/><button id="btnRefrescar">🔄 Refrescar</button></div>
+    <div style="margin-top:10px;overflow:auto">
+      <table id="tblClientes"><thead><tr>
+        <th>ID</th><th>Nombre / Razón social</th><th>RFC</th><th>Email</th><th>Teléfono</th><th>Contactos</th><th>Acciones</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</main>
+
+<template id="tplContacto">
+  <div class="row" style="align-items:flex-end;margin-bottom:8px">
+    <div style="min-width:220px"><label>Nombre</label><br/><input class="c-nombre" required placeholder="Nombre de contacto"/></div>
+    <div style="min-width:200px"><label>Teléfono</label><br/><input class="c-tel" placeholder="Teléfono"/></div>
+    <div style="min-width:200px"><label>Área</label><br/><input class="c-area" placeholder="Área (p.ej. Ventas)"/></div>
+    <div style="min-width:220px"><label>Email</label><br/><input class="c-email" type="email" placeholder="correo@dominio.com"/></div>
+    <button type="button" class="btnDel">🗑️</button>
+  </div>
+</template>
+
+<script>
+const API = "http://127.0.0.1:8000";
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const contactosDiv = $('#contactos'), tpl = $('#tplContacto');
+
+function addContacto(nombre='', tel='', area='', email=''){
+  const node = tpl.content.cloneNode(true);
+  node.querySelector('.c-nombre').value = nombre;
+  node.querySelector('.c-tel').value = tel;
+  node.querySelector('.c-area').value = area;
+  node.querySelector('.c-email').value = email;
+  const row = node.querySelector('.row');
+  row.querySelector('.btnDel').onclick = () => row.remove();
+  contactosDiv.appendChild(node);
+}
+function getContactos(){
+  return $$('#contactos .row').map(row => ({
+    nombre: row.querySelector('.c-nombre').value.trim(),
+    telefono: row.querySelector('.c-tel').value.trim() || null,
+    area: row.querySelector('.c-area').value.trim() || null,
+    email: row.querySelector('.c-email').value.trim() || null
+  })).filter(c => c.nombre.length>0);
+}
+function limpiarFormulario(){
+  $('#cliente_id').value=''; $('#razon_social').value=''; $('#rfc').value='';
+  $('#telefono').value=''; $('#email').value=''; $('#email_principal').value='';
+  $('#observaciones').value=''; contactosDiv.innerHTML='';
+  addContacto('Contacto 1','','General',''); addContacto('Contacto 2','','Ventas','');
+}
+async function guardarCliente(e){
+  e.preventDefault();
+  const payload = {
+    razon_social: $('#razon_social').value.trim(),
+    rfc: $('#rfc').value.trim().toUpperCase(),
+    telefono: $('#telefono').value.trim() || null,
+    email: $('#email').value.trim() || null,
+    email_principal: $('#email_principal').value.trim() || null,
+    observaciones: $('#observaciones').value.trim() || null,
+    contactos: getContactos()
+  };
+  const id = $('#cliente_id').value;
+  const url = id ? `${API}/clientes/${id}` : `${API}/clientes/`;
+  const method = id ? 'PUT' : 'POST';
+  const r = await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  if(!r.ok){ const t=await r.text(); alert('Error: '+t); return; }
+  await cargarClientes(); limpiarFormulario(); alert('Cliente guardado');
+}
+async function cargarClientes(){
+  const r = await fetch(`${API}/clientes/`); const data = r.ok ? await r.json() : [];
+  const term = $('#filtro').value.trim().toLowerCase(); const tbody = $('#tblClientes tbody'); tbody.innerHTML='';
+  data.filter(x => (x.razon_social+' '+x.rfc).toLowerCase().includes(term)).forEach(x=>{
+    const contactos = (x.contactos||[]).map(c => {
+      let s = c.nombre;
+      if (c.area) s += ` (${c.area})`;
+      if (c.email) s += ` <${c.email}>`;
+      if (c.telefono) s += ` ${c.telefono}`;
+      return s;
+    }).join(', ');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${x.cliente_id}</td><td>${x.razon_social}</td><td>${x.rfc}</td>
+      <td>${x.email||''}</td><td>${x.telefono||''}</td><td>${contactos}</td>
+      <td class='actions'><button data-id='${x.cliente_id}' class='btnEdit'>✏️ Editar</button></td>`;
+    tbody.appendChild(tr);
+  });
+  $$('.btnEdit').forEach(btn => btn.onclick = ()=> editarCliente(parseInt(btn.getAttribute('data-id'))));
+}
+async function editarCliente(id){
+  const r = await fetch(`${API}/clientes/`); const data = r.ok ? await r.json() : [];
+  const x = data.find(k=>k.cliente_id===id); if(!x){alert('No encontrado'); return;}
+  $('#cliente_id').value=x.cliente_id; $('#razon_social').value=x.razon_social; $('#rfc').value=x.rfc;
+  $('#telefono').value=x.telefono||''; $('#email').value=x.email||''; $('#email_principal').value=x.email_principal||'';
+  $('#observaciones').value=x.observaciones||''; contactosDiv.innerHTML='';
+  (x.contactos||[]).forEach(c=>addContacto(c.nombre,c.telefono||'',c.area||'',c.email||'')); if((x.contactos||[]).length===0){addContacto('Contacto 1','','General','');}
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+$('#btnAddContacto').onclick = ()=> addContacto();
+$('#frmCliente').addEventListener('submit', guardarCliente);
+$('#btnRefrescar').onclick = cargarClientes;
+$('#btnNuevo').onclick = limpiarFormulario;
+$('#filtro').addEventListener('input', cargarClientes);
+limpiarFormulario(); cargarClientes();
+</script>
+</body></html>

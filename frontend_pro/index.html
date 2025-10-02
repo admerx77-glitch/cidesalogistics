@@ -1,12 +1,27 @@
-﻿<!doctype html>
-<html lang='es'>
-<head>
-  <meta charset='utf-8' />
-  <title>CIAD99 — CIDESA</title>
-</head>
-<body>
-  <h1>CIAD99 — Dashboard (placeholder)</h1>
-  <div id='app'></div>
-  <script src='main.js'></script>
-</body>
-</html>
+﻿<!doctype html><html lang="es"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>CIDESA LOGISTICS — Inicio</title><link rel="stylesheet" href="./styles.css"/>
+</head><body>
+<aside><div class="brand"><div class="logo"><span>CL</span></div>
+<div><strong>CIDESA LOGISTICS</strong><div class="badge">Panel principal</div></div></div>
+<nav>
+  <a href="./index.html">🏠 Inicio</a>
+  <a href="./clientes.html">👤 Alta de Clientes</a>
+</nav></aside>
+<main>
+  <div class="card"><h1>Bienvenido</h1>
+  <p>Estás entrando al <strong>Sistema de CIDESA LOGISTICS</strong>.</p>
+  <div class="row" style="margin-top:10px">
+    <a href="./clientes.html"><button class="primary">➡️ ALTA DE CLIENTES</button></a>
+  </div></div>
+  <div class="card"><h2>Estado del backend</h2><div id="status">Verificando…</div></div>
+</main>
+<script>
+(async function(){
+  try{
+    const r = await fetch("http://127.0.0.1:8000/health"); await r.json();
+    document.getElementById("status").innerHTML='Backend: <span style="color:#69db7c">OK</span>';
+  }catch{ document.getElementById("status").innerHTML='Backend: <span style="color:#ffa8a8">No disponible</span>'; }
+})();
+</script>
+</body></html>
