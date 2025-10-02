@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CIDESA - MVP Clientes</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 20px; }
+      input, button { padding: 8px; margin: 4px; }
+      table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+      th, td { border: 1px solid #ddd; padding: 8px; }
+      th { background: #f4f4f4; }
+      .card { border:1px solid #ddd; padding:12px; border-radius:8px; margin-bottom:10px; }
+    </style>
+  </head>
+  <body>
+    <h1>CIDESA - MVP Clientes</h1>
+    <div class="card">
+      <h3>Crear cliente</h3>
+      <input id="rfc" placeholder="RFC" />
+      <input id="razon" placeholder="Razón Social" />
+      <input id="email" placeholder="Email" />
+      <input id="tel" placeholder="Teléfono" />
+      <button onclick="crear()">Guardar</button>
+    </div>
+    <div class="card">
+      <h3>Listado</h3>
+      <input id="q" placeholder="Buscar (RFC/Razón)" oninput="listar()" />
+      <div id="tabla"></div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

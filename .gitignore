@@ -1,0 +1,37 @@
+﻿# Python
+__pycache__/
+*.pyc
+.venv/
+env/
+venv/
+
+# Node/Frontend
+node_modules/
+dist/
+*.log
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.swp
+
+# Env/Secrets
+.env
+.env.*
+
+# DB/Backups
+*.sqlite
+database/*.bak
+database/*.dump
+
+# Uploads (no versionar)
+uploads/
+
+# IDE
+.vscode/
+.idea/
+
+# Binarios pesados (evitar)
+*.pdf
+*.zip
+*.rar

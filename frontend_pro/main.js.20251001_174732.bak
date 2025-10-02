@@ -1,0 +1,172 @@
+﻿const API_BASE = 'http://127.0.0.1:8000/api';
+
+const el = (id) => document.getElementById(id);
+const tbody = el('tbody');
+const toastEl = el('toast');
+const toastBody = el('toastBody');
+const toast = new bootstrap.Toast(toastEl);
+const modalEdit = new bootstrap.Modal(document.getElementById('modalEdit'));
+
+function showToast(msg) { toastBody.textContent = msg; toast.show(); }
+function setLoading(s) { el('loader')?.style && (el('loader').style.display = s ? 'inline-block' : 'none'); }
+
+async function fetchJSON(url, options={}) {
+  const opts = { headers: { 'Content-Type':'application/json' }, ...options };
+  const res = await fetch(url, opts);
+  if (!res.ok) throw new Error(await res.text().catch(()=> `HTTP ${res.status}`));
+  return res.json();
+}
+async function fetchForm(url, formData, options={}) {
+  const res = await fetch(url, { method:'POST', body: formData, ...options });
+  if (!res.ok) throw new Error(await res.text().catch(()=> `HTTP ${res.status}`));
+  return res.json();
+}
+
+function badgeActivo(v){ return v ? '<span class="badge text-bg-success">Activo</span>' : '<span class="badge text-bg-secondary">Inactivo</span>'; }
+
+async function listar() {
+  setLoading(true);
+  try {
+    const q = (el('q').value || '').trim();
+    const url = new URL(API_BASE + '/clientes/');
+    if (q) url.searchParams.set('q', q);
+    const data = await fetchJSON(url);
+    tbody.innerHTML = data.map(c => `
+      <tr>
+        <td>${c.cliente_id ?? ''}</td>
+        <td>${c.rfc ?? ''}</td>
+        <td>${c.razon_social ?? ''}</td>
+        <td>${c.email ?? ''}</td>
+        <td>${c.telefono ?? ''}</td>
+        <td>${badgeActivo(c.activo)}</td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-outline-primary" onclick="abrirEditar(${c.cliente_id})">Editar</button>
+          <button class="btn btn-sm btn-outline-danger" onclick="borrar(${c.cliente_id})">Borrar</button>
+        </td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    showToast('Error al listar: ' + e.message);
+  } finally {
+    setLoading(false);
+  }
+}
+
+async function crear(evt) {
+  evt.preventDefault();
+  const form = evt.target;
+  if (!form.checkValidity()) { form.classList.add('was-validated'); return; }
+  const body = {
+    rfc: el('rfc').value.trim(),
+    razon_social: el('razon').value.trim(),
+    email: el('email').value.trim() || null,
+    telefono: el('tel').value.trim() || null,
+    activo: el('activo').checked
+  };
+  try {
+    await fetchJSON(API_BASE + '/clientes/', { method:'POST', body: JSON.stringify(body) });
+    showToast('Cliente creado');
+    form.reset(); form.classList.remove('was-validated');
+    await listar();
+  } catch (e) { showToast('Error al crear: ' + e.message); }
+}
+
+async function abrirEditar(id) {
+  try {
+    const c = await fetchJSON(API_BASE + '/clientes/' + id);
+    el('edit_id').value = c.cliente_id;
+    el('edit_rfc').value = c.rfc || '';
+    el('edit_razon').value = c.razon_social || '';
+    el('edit_email').value = c.email || '';
+    el('edit_tel').value = c.telefono || '';
+    el('edit_activo').checked = !!c.activo;
+    await cargarDocs(id);
+    modalEdit.show();
+  } catch (e) {
+    showToast('No se pudo abrir edición: ' + e.message);
+  }
+}
+
+async function guardarEdit() {
+  const id = el('edit_id').value;
+  const upd = {
+    rfc: el('edit_rfc').value.trim(),
+    razon_social: el('edit_razon').value.trim(),
+    email: el('edit_email').value.trim() || null,
+    telefono: el('edit_tel').value.trim() || null,
+    activo: el('edit_activo').checked
+  };
+  try {
+    await fetchJSON(`${API_BASE}/clientes/${id}`, { method:'PUT', body: JSON.stringify(upd) });
+    showToast('Cliente actualizado');
+    await listar();
+    // no cierro el modal para que puedas seguir subiendo docs
+  } catch (e) {
+    showToast('Error al actualizar: ' + e.message);
+  }
+}
+
+async function cargarDocs(id) {
+  try {
+    const docs = await fetchJSON(`${API_BASE}/clientes/${id}/docs`);
+    const ul = document.getElementById('listaDocs');
+    if (!docs.length) { ul.innerHTML = '<li class="list-group-item">Sin documentos</li>'; return; }
+    ul.innerHTML = docs.map(d => `
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        <a href="${d.file_url}" target="_blank">${d.filename}</a>
+        <button class="btn btn-sm btn-outline-danger" onclick="borrarDoc(${id}, ${d.doc_id})">Eliminar</button>
+      </li>
+    `).join('');
+  } catch (e) {
+    showToast('No se pudieron cargar documentos: ' + e.message);
+  }
+}
+
+async function subirDoc() {
+  const id = el('edit_id').value;
+  const f = el('fileInput').files[0];
+  if (!f) { showToast('Selecciona un archivo'); return; }
+  const fd = new FormData();
+  fd.append('archivo', f);
+  try {
+    await fetchForm(`${API_BASE}/clientes/${id}/upload`, fd);
+    el('fileInput').value = '';
+    await cargarDocs(id);
+    showToast('Documento subido');
+  } catch (e) {
+    showToast('Error al subir: ' + e.message);
+  }
+}
+
+async function borrar(id) {
+  if (!confirm('¿Borrar cliente '+id+'? (soft delete si existe "activo")')) return;
+  try {
+    await fetchJSON(API_BASE + '/clientes/' + id, { method:'DELETE' });
+    showToast('Cliente borrado');
+    await listar();
+  } catch (e) { showToast('Error al borrar: ' + e.message); }
+}
+async function borrarDoc(id, docId) {
+  if (!confirm('¿Eliminar documento?')) return;
+  try {
+    await fetchJSON(`${API_BASE}/clientes/${id}/docs/${docId}`, { method:'DELETE' });
+    await cargarDocs(id);
+    showToast('Documento eliminado');
+  } catch (e) { showToast('Error al eliminar: ' + e.message); }
+}
+
+document.getElementById('formCliente').onsubmit = crear;
+document.getElementById('btnLimpiar').onclick = () => {
+  const f = document.getElementById('formCliente');
+  f.reset(); f.classList.remove('was-validated'); f.onsubmit = crear;
+};
+document.getElementById('btnBuscar').onclick = listar;
+document.getElementById('btnRefrescar').onclick = listar;
+
+document.getElementById('btnSubir').onclick = subirDoc;
+document.getElementById('btnGuardarEdit').onclick = guardarEdit;
+
+window.abrirEditar = abrirEditar;
+window.borrar = borrar;
+
+listar();

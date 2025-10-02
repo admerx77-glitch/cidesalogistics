@@ -1,0 +1,121 @@
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
+from sqlalchemy import text, MetaData, Table, inspect
+from sqlalchemy.orm import Session
+from typing import Optional, List, Dict, Any
+from ..deps import get_session
+
+router = APIRouter()
+
+class ClienteIn(BaseModel):
+    rfc: str = Field(..., min_length=10, max_length=13)
+    razon_social: str = Field(..., min_length=2, max_length=255)
+    email: Optional[str] = None
+    telefono: Optional[str] = None
+    activo: Optional[bool] = True
+
+class ClienteOut(BaseModel):
+    cliente_id: int
+    rfc: Optional[str] = None
+    razon_social: Optional[str] = None
+    email: Optional[str] = None
+    telefono: Optional[str] = None
+    activo: Optional[bool] = None
+
+def reflect_clientes_table(session: Session) -> Table:
+    meta = MetaData()
+    meta.reflect(bind=session.bind, only=["ciad99_clientes"])
+    return meta.tables["ciad99_clientes"]
+
+@router.get("/", response_model=List[ClienteOut])
+def listar_clientes(q: Optional[str] = Query(None, description="Buscar por RFC o razón social"),
+                    limit: int = 50, offset: int = 0):
+    with get_session() as session:
+        clientes = reflect_clientes_table(session)
+        insp = inspect(session.bind)
+        cols = clientes.c
+
+        where = ""
+        params = {"limit": limit, "offset": offset}
+        if q:
+            like = f"%{q}%"
+            if "rfc" in clientes.c and "razon_social" in clientes.c:
+                where = "WHERE (rfc ILIKE :like OR razon_social ILIKE :like)"
+                params["like"] = like
+
+        sql = f"SELECT * FROM ciad99_clientes {where} ORDER BY 1 DESC LIMIT :limit OFFSET :offset"
+        rows = session.execute(text(sql), params).mappings().all()
+        return [ClienteOut(**row) for row in rows]
+
+@router.post("/", response_model=ClienteOut)
+def crear_cliente(cli: ClienteIn):
+    with get_session() as session:
+        clientes = reflect_clientes_table(session)
+        # Preparar insert solo con columnas existentes
+        data = {}
+        for k, v in cli.dict().items():
+            if k in clientes.c:
+                data[k] = v
+        # Insert y retorno
+        columns = ", ".join(data.keys())
+        values = ", ".join([f":{k}" for k in data.keys()])
+        sql = text(f"INSERT INTO ciad99_clientes ({columns}) VALUES ({values}) RETURNING *;")
+        row = session.execute(sql, data).mappings().first()
+        session.commit()
+        return ClienteOut(**row)
+
+@router.get("/{cliente_id}", response_model=ClienteOut)
+def obtener_cliente(cliente_id: int):
+    with get_session() as session:
+        row = session.execute(text("SELECT * FROM ciad99_clientes WHERE cliente_id=:id"),
+                              {"id": cliente_id}).mappings().first()
+        if not row:
+            raise HTTPException(status_code=404, detail="Cliente no encontrado")
+        return ClienteOut(**row)
+
+@router.put("/{cliente_id}", response_model=ClienteOut)
+def actualizar_cliente(cliente_id: int, cli: ClienteIn):
+    with get_session() as session:
+        clientes = reflect_clientes_table(session)
+        # Solo columnas existentes
+        data = {}
+        for k, v in cli.dict().items():
+            if k in clientes.c:
+                data[k] = v
+        if not data:
+            raise HTTPException(status_code=400, detail="Nada para actualizar")
+        set_clause = ", ".join([f"{k}=:{k}" for k in data.keys()])
+        data["id"] = cliente_id
+        row = session.execute(text(f"UPDATE ciad99_clientes SET {set_clause} WHERE cliente_id=:id RETURNING *;"),
+                              data).mappings().first()
+        if not row:
+            raise HTTPException(status_code=404, detail="Cliente no encontrado")
+        session.commit()
+        return ClienteOut(**row)
+
+@router.delete("/{cliente_id}")
+def borrar_cliente(cliente_id: int, hard: bool = False):
+    with get_session() as session:
+        # Soft delete si existe columna 'activo'
+        if not hard:
+            # revisar si hay columna 'activo'
+            cols = session.execute(text("""
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema='public' AND table_name='ciad99_clientes' AND column_name='activo'
+            """)).scalar()
+            if cols:
+                row = session.execute(text(
+                    "UPDATE ciad99_clientes SET activo=FALSE WHERE cliente_id=:id RETURNING cliente_id;"
+                ), {"id": cliente_id}).first()
+                session.commit()
+                if not row:
+                    raise HTTPException(status_code=404, detail="Cliente no encontrado")
+                return {"status": "ok", "soft_deleted": True, "cliente_id": cliente_id}
+        # hard delete
+        row = session.execute(text(
+            "DELETE FROM ciad99_clientes WHERE cliente_id=:id RETURNING cliente_id;"
+        ), {"id": cliente_id}).first()
+        session.commit()
+        if not row:
+            raise HTTPException(status_code=404, detail="Cliente no encontrado")
+        return {"status": "ok", "deleted": True, "cliente_id": cliente_id}

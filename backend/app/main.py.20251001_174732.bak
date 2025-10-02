@@ -1,0 +1,32 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
+
+# IMPORTA LOS ROUTERS
+from .routers import clientes, clientes_docs
+
+app = FastAPI(title="CIDESA App - MVP Clientes", version="0.2.0")
+
+# CORS (frontend en 5173)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # en prod: ["http://127.0.0.1:5173"]
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Carpeta de uploads y static
+UPLOAD_ROOT = Path(__file__).resolve().parent.parent / "uploads"
+UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(UPLOAD_ROOT)), name="uploads")
+
+# MONTA RUTAS (fíjate en el prefix)
+app.include_router(clientes.router, prefix="/api/clientes", tags=["clientes"])
+app.include_router(clientes_docs.router, prefix="/api/clientes", tags=["clientes-docs"])
+
+@app.get("/api/health")
+def health():
+    return {"status": "ok"}
+
